@@ -1,0 +1,91 @@
+{
+    "id": <numeric>,
+    "userId": <numeric>,
+    "rid": <string>,
+    "name": <string>,
+    "description": <string>,
+    "version": <numeric>,
+    "schemaVersion": <numeric>,
+    "dataSource": <dict> {
+        "type": <string>,
+        "connectionString": <string>,
+        "tables": <list of dicts> [
+            {
+                "name": <string>,
+                "primaryKey": <dict> {
+                    "id": <string>
+                }
+            },
+            ...
+        ],
+        "joins": <list of dicts> [
+            {
+                "name": <string>,
+                "from": <string>,
+                "to": <string>,
+                "path": <list of lists of exactly 3 strings> [
+                    [
+                        <string>,
+                        <string>,
+                        <string>
+                    ]
+                ]
+            },
+            ...
+        ]
+    },
+    "ontology": <dict> {
+        "relationships": <list of dicts> [
+            {
+                "name": <string>,
+                "from": <string>,
+                "to": <string>,
+                "join": <list of strings> [
+                    <string>,
+                    ...
+                ],
+                "relation": <string>
+            },
+            ...
+        ],
+        "entities": <list of dicts> [
+            {
+                "name": <string>,
+                "nicename": <list of exactly 2 strings> [
+                    <string>,
+                    <string>
+                ],
+                "table": <string>,
+                "id": <string>,
+                "idType": <string>,
+                "metrics": <dict> {
+                    <string>: <list of exactly 2 strings> [<"-inf" or "+inf">, <"-inf" or "+inf">],
+                    ...
+                },
+                "attributes": <dict> {
+                    <string>: <dict> {
+                        "nicename": <list of exactly 2 strings> [
+                            <string>,
+                            <string>
+                        ],
+                        "isa": <"string", "integer", "float", or "date">,
+                        "type": <list of strings> [
+                            <string>,
+                            ...
+                        ],
+                        "source": {
+                            "table": <string>,
+                            "columns": <list strings> [
+                                <string>,
+                                ...
+                            ]
+                        }
+                    },
+                    ...
+                }
+            },
+            ...
+        ]
+    }
+}
+
