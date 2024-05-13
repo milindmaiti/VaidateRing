@@ -1,10 +1,41 @@
-from typing import List, Dict, Set
+from typing import List, Dict, Set, Tuple, Any, Type
 import json
 
-def validateType(content, typ, specificValue = None):
+class CustomField:
+    def __init__(self, name: str, typ: Type[int | str | float | dict | list] | tuple, validator, errorString) -> None:
+        self.name = name
+        self.typ = typ
+        self.validator = validator
+        self.errorString = errorString
+
+    def __str__(self) -> str:
+        return f"Name: {self.name}, Type: {self.typ}, Validator: {self.validator}, errorString: {self.errorString}"
+
+class ParseDict:
+    def __init__(self, fields: List[CustomField]):
+        self.fields: List[CustomField] = fields
+ 
+    def validate(self, json: Dict):
+        for field in self.fields:
+            try:
+                validate_field(field, json)
+            except:
+                raise Exception(f"Error in field: {field}")
+
+class ParseList:
+    def __init__(self, listType: CustomField , specificValue: Any = None, specificNumber: None | int = None) -> None:
+        self.listType = listType 
+        self.specificValue = specificValue
+        self.specificNumber = specificNumber
+
+    def validate(self, json: Dict):
+        if(self.specificNumber != None and self.specificNumber != len(json)):
+            raise Exception(f"RingValidator: List doesn't have required number of elements, has: {len(json)}, needs: {self.specificNumber}")
+        for element in json:
+            validate_type(element, self.listType, self.specificValue)
+
+def validate_type(content: Dict, typ: CustomField, specificValue: Any = None):
     if not isinstance(content, typ.typ):
-        print(content)
-        print(typ)
         if(typ.name != None):
             raise Exception(f"RingValidator: '{typ.name}' must be {typ.errorString}")
         else:
@@ -19,135 +50,95 @@ def validateType(content, typ, specificValue = None):
     if(typ.validator != None):
         typ.validator.validate(content)
 
-def validateField(field, curjson): 
+def validate_field(field: CustomField, curjson: Dict): 
     if(field.name != '' and field.name not in curjson):
-        print(curjson)
         raise Exception(f"RingValidator: '{field.name}' field is missing")
-        
-
     if(field.name == ""):
-        validateType(curjson[next(iter(curjson))], field)
+        validate_type(curjson[next(iter(curjson))], field)
     else:
-        validateType(curjson[field.name], field)
+        validate_type(curjson[field.name], field)
     
-class customField:
-    def __init__(self, name, typ, validator, errorString) -> None:
-        self.name = name
-        self.typ = typ
-        self.validator = validator
-        self.errorString = errorString
 
-    def __str__(self) -> str:
-        return f"Name: {self.name}, Type: {self.typ}, Validator: {self.validator}, errorString: {self.errorString}"
+def CreateNumeric(name):
+    return CustomField(name, (int, float), None, "numeric")
+def CreateStr(name):
+    return CustomField(name, str, None, "string")
+def CreateDict(name, validator):
+    return CustomField(name, dict, validator, "dict")
+def CreateList(name, validator):
+    return CustomField(name, list, validator, "list")
 
-class parseDict:
-    def __init__(self, fields):
-        self.fields: List[customField] = fields
- 
-    def validate(self, json):
-        for field in self.fields:
-            try:
-                validateField(field, json)
-            except:
-                raise Exception(f"Error in field: {field}")
-
-class parseList:
-    def __init__(self, listType, specificValue = None, specificNumber = None) -> None:
-        self.listType: customField = listType 
-        self.specificValue = specificValue
-        self.specificNumber = specificNumber
-
-    def validate(self, json):
-        if(self.specificNumber != None and self.specificNumber != len(json)):
-            raise Exception(f"RingValidator: List doesn't have required number of elements, has: {len(json)}, needs: {self.specificNumber}")
-        for element in json:
-            validateType(element, self.listType, self.specificValue)
-
-def createNumeric(name):
-    return customField(name, (int, float), None, "numeric")
-def createStr(name):
-    return customField(name, str, None, "string")
-def createDict(name, validator):
-    return customField(name, dict, validator, "dict")
-def createList(name, validator):
-    return customField(name, list, validator, "list")
-
-primaryKey = [
-        createStr("")
-]
-table = [
-    createStr("name"),
-    createDict("primaryKey", parseDict(primaryKey))
-]
-
-pathStructure = parseList(createStr(None), None, 3) 
-pathList = createList("path", pathStructure) 
-join = [
-    createStr("name"),
-    createStr("from"),
-    createStr("to"),
-    createList("path", parseList(pathList))
-]
-joinStructure = createDict(None,parseDict(join))
-dataSource = [
-    createStr("type"),
-    createStr("connectionString"),
-    createList("tables", parseList(createDict(None, parseDict(table)))),
-    createList("joins", parseList(joinStructure))
-]
-
-relationshipStructure = [
-    createStr("name"),
-    createStr("from"),
-    createStr("to"),
-    createList("join", parseList(createStr(None))),
-    createStr("relation")
-]
-
-
-source = [
-        createStr("table"),
-        createList("columns", parseList(createStr(None)))
+class ValidateRing:
+    def __init__(self):
+        self.primaryKey = [CreateStr("")]
+        self.table = [CreateStr("name"), CreateDict("primaryKey", ParseDict(self.primaryKey))]
+        self.pathStructure = ParseList(CreateStr(None), None, 3) 
+        self.pathList = CreateList("path", self.pathStructure) 
+        self.join = [
+            CreateStr("name"),
+            CreateStr("from"),
+            CreateStr("to"),
+            CreateList("path", ParseList(self.pathList))
         ]
-attributeStructure = [
-    createList("nicename", parseList(createStr(None), None, 2)),
-    customField("isa", (int, str, float), None, "string, float, int, or date"),
-    createList("type", parseList(createStr(None))),
-    createDict("source", parseDict(source))
-]
-attribute = [
-    createDict("", parseDict(attributeStructure))
+        self.joinStructure = CreateDict(None,ParseDict(self.join))
+        self.dataSource = [
+            CreateStr("type"),
+            CreateStr("connectionString"),
+            CreateList("tables", ParseList(CreateDict(None, ParseDict(self.table)))),
+            CreateList("joins", ParseList(self.joinStructure))
         ]
-metric = [
-    createList("", parseList(createStr(None), ["-inf", "+inf"], 2))
+        self.relationshipStructure = [
+            CreateStr("name"),
+            CreateStr("from"),
+            CreateStr("to"),
+            CreateList("join", ParseList(CreateStr(None))),
+            CreateStr("relation")
         ]
-entity = [
-        createStr("name"),
-        createList("nicename", parseList(createStr(None), None, 2)),
-        createStr("table"),
-        createStr("id"),
-        createStr("idType"),
-        createDict("metrics", parseDict(metric)),
-        createDict("attributes", parseDict(attribute))
+        self.source = [
+                CreateStr("table"),
+                CreateList("columns", ParseList(CreateStr(None)))
+            ]
+        self.attributeStructure = [
+            CreateList("nicename", ParseList(CreateStr(None), None, 2)),
+            CustomField("isa", (int, str, float), None, "string, float, int, or date"),
+            CreateList("type", ParseList(CreateStr(None))),
+            CreateDict("source", ParseDict(self.source))
         ]
+        self.attribute = [CreateDict("", ParseDict(self.attributeStructure))]
+        self.metric = [
+            CreateList("", ParseList(CreateStr(None), ["-inf", "+inf"], 2))
+                ]
+        self.entity = [
+                CreateStr("name"),
+                CreateList("nicename", ParseList(CreateStr(None), None, 2)),
+                CreateStr("table"),
+                CreateStr("id"),
+                CreateStr("idType"),
+                # CreateDict("metrics", ParseDict(metric)),
+                CreateDict("attributes", ParseDict(self.attribute))
+                ]
 
-ontology = [
-    createList("relationships", parseList(createDict(None, parseDict(relationshipStructure)))),
-    createList("entities", parseList(createDict(None, parseDict(entity))))
-]
-ring = [
-        createNumeric("id"),
-        createNumeric("userId"),
-        createStr("rid"),
-        createStr("name"),
-        createStr("description"),
-        createNumeric("version"),
-        createNumeric("schemaVersion"),
-        createDict("dataSource", parseDict(dataSource)),
-        createDict("ontology", parseDict(ontology)) 
-]
+        self.ontology = [
+            CreateList("relationships", ParseList(CreateDict(None, ParseDict(self.relationshipStructure)))),
+            CreateList("entities", ParseList(CreateDict(None, ParseDict(self.entity))))
+        ]
+        self.ring = [
+                CreateNumeric("id"),
+                CreateNumeric("userId"),
+                CreateStr("rid"),
+                CreateStr("name"),
+                CreateStr("description"),
+                CreateNumeric("version"),
+                CreateNumeric("schemaVersion"),
+                CreateDict("dataSource", ParseDict(self.dataSource)),
+                CreateDict("ontology", ParseDict(self.ontology)) 
+        ]
+        self.parser = ParseDict(self.ring)
+    def validate(self, json: Dict):
+        self.parser.validate(json)
 
-f = open('ring.json') 
-data = json.load(f)
-RingValidator = parseDict(ring)
-RingValidator.validate(data)   
+if __name__ == "__main__":
+    f = open('ring.json') 
+    data = json.load(f)
+    RingValidator = ValidateRing()
+    RingValidator.validate(data)   
